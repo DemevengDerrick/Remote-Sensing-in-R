@@ -60,7 +60,7 @@ Train the Random Forest Classifier
 
 ```{r}
 
-sc <- RStoolbox::superClass(uc$map, trainData = train, responseCol = "class", model = "rf", tuneLength = 1, trainPartition = 0.7)
+sc <- RStoolbox::superClass(uc$map, trainData = train, responseCol = "class", model = "rf", tuneLength = 1, trainPartition = 0.8)
 ```
 
 Confusion Metrix
@@ -68,4 +68,98 @@ Confusion Metrix
 ```{r}
 
 sc$modelFit
+```
+
+Visualize result
+
+```{r}
+
+r <- as.factor(sc$map)
+levels(r) <- data.frame(ID = 1:4, class_supervised = levels(train$class))
+ggR(r, geom_raster = T, forceCat = T) + scale_fill_manual(values = c("yellow", "darkgreen", "blue"))
+```
+
+## Cloud Masking
+
+```{r}
+
+ggRGB(lsat, stretch = "lin")
+```
+
+Cloud Index
+
+```{r}
+
+cldmsk    <- cloudMask(lsat, blue = 1, tir = 6)
+ggR(cldmsk, 2, geom_raster = TRUE) 
+```
+
+```{r}
+# mask by threshold, region-growing around the core cloud pixels
+cldmsk_final <- cloudMask(cldmsk, threshold = 0.1, buffer = 5) 
+
+## plot cloudmask 
+ggRGB(lsat, stretch = "lin") +
+  ggR(cldmsk_final[[1]], ggLayer = TRUE, forceCat = TRUE, geom_raster = TRUE) +
+  scale_fill_manual(values = c("red"), na.value = NA)
+```
+
+## Radiometric and Atmospheric Correction
+
+```{r}
+
+# import Landsat meta data
+mtlFile  <- system.file("external/landsat/LT52240631988227CUB02_MTL.txt", package="RStoolbox")
+
+metaData <- readMeta(mtlFile)
+lsat_t <- stackMeta(mtlFile)
+
+# convert DN to top of atmosphere reflectance and brightness temperature
+lsat_ref <- radCor(lsat_t, metaData = metaData, method = "apref")
+
+# correct DN to at-surface-reflecatance with DOS (Chavez decay model)
+lsat_sref <- radCor(lsat_t, metaData = metaData)
+
+# correct DN to at-surface-reflecatance with simple DOS and automatic haze estimation
+hazeDN    <- estimateHaze(lsat_t, hazeBands = 1:4, darkProp = 0.01, plot = FALSE)
+lsat_sref <- radCor(lsat_t, metaData = metaData, method = "sdos",
+                    hazeValues = hazeDN, hazeBands = 1:4)
+
+# plot result
+ggRGB(lsat_sref, r = 3, g = 2, b = 1, stretch = "lin")
+```
+
+## FALSE COLOR COMPOSITION
+
+```{r}
+
+# plot result
+ggRGB(lsat, r = 4, g = 3, b = 2, stretch = "lin")
+```
+
+## NDVI
+
+```{r}
+
+ndvi <- RStoolbox::spectralIndices(lsat, red = 1, nir = 4, indices = "NDVI")
+```
+
+```{r}
+
+RStoolbox::ggR(ndvi, geom_raster = TRUE) +
+  scale_fill_gradientn(colours = c("black", "white")) 
+```
+
+All Possible Indices
+
+```{r}
+
+mtlFile  <- system.file("external/landsat/LT52240631988227CUB02_MTL.txt", package="RStoolbox")
+lsat_ref <- radCor(lsat, mtlFile, method = "apref")
+```
+
+```{r}
+
+SI <- spectralIndices(lsat_ref, red = "B3_tre", nir = "B4_tre")
+plot(SI)
 ```
