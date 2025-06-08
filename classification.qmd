@@ -1,0 +1,71 @@
+---
+title: "Image classification"
+author: "Derrick Demeveng"
+format: html
+editor: visual
+---
+
+## Load Libraries
+
+```{r}
+
+if(!require("pacman")) install.packages("pacman")
+
+pacman::p_load(
+  RStoolbox,
+  ggplot2,
+  caret,
+  randomForest,
+  terra
+)
+
+```
+
+## Unsupervised Classification
+
+Classify image
+
+```{r}
+
+uc <- RStoolbox::unsuperClass(lsat, nClasses = 3)
+```
+
+Plot image
+
+```{r}
+
+RStoolbox::ggR(uc$map, geom_raster = T, forceCat = T) +
+  ggplot2::scale_fill_manual(values = c("darkgreen", "blue", "sandybrown"))
+```
+
+## Supervised Classification
+
+Load training data
+
+```{r}
+
+train <- readRDS(system.file("external/trainingPolygons_lsat.rds", package="RStoolbox"))
+```
+
+Visualize the training data on top of the RGB image
+
+```{r}
+
+ggRGB(lsat, r = 3, g = 2, b=1, stretch = "lin") +
+  ggplot2::geom_sf(data = train, aes(fill = class)) + 
+  ggplot2::scale_fill_manual(values = c("yellow", "sandybrown", "darkgreen", "blue"))
+```
+
+Train the Random Forest Classifier
+
+```{r}
+
+sc <- RStoolbox::superClass(uc$map, trainData = train, responseCol = "class", model = "rf", tuneLength = 1, trainPartition = 0.7)
+```
+
+Confusion Metrix
+
+```{r}
+
+sc$modelFit
+```
